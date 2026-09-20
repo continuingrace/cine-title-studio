@@ -1,0 +1,10 @@
+{
+  "name":"Ciné Title Studio",
+  "short_name":"Ciné Title",
+  "description":"사진과 영상에 빈티지 타이포그래피 오프닝을 만드는 도구",
+  "start_url":"./",
+  "display":"standalone",
+  "background_color":"#171613",
+  "theme_color":"#171613",
+  "icons":[{"src":"favicon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}]
+}
