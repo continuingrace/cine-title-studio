@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#171613" />
+  <meta name="description" content="사진과 영상 위에 빈티지 영화 타이틀을 만드는 로컬 오프닝 시퀀스 스튜디오" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@1,6..96,500;1,6..96,700&family=Cormorant+Garamond:ital,wght@0,500;1,500;1,600&family=DM+Sans:wght@400;500;600&family=DM+Serif+Display:ital@0;1&family=Italiana&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <title>Ciné Title Studio</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="Ciné Title Studio 처음으로">
+      <span class="brand-mark">C</span>
+      <span>Ciné Title</span>
+    </a>
+    <div class="top-meta"><span class="privacy-dot"></span>기기 안에서만 작업 <span class="version">v0.4.0</span></div>
+  </header>
+
+  <main class="workspace">
+    <section class="stage-panel" aria-label="영상 미리보기">
+      <div class="stage-shell">
+        <canvas id="previewCanvas" width="1080" height="1920" aria-label="오프닝 시퀀스 미리보기"></canvas>
+        <div class="empty-state" id="emptyState">
+          <div class="empty-monogram">Aa</div>
+          <p>사진과 영상을 여러 장 올려<br>오프닝 시퀀스를 만들어보세요.</p>
+          <button class="button light" id="stageUploadButton" type="button">미디어 여러 개 선택</button>
+        </div>
+        <div class="render-badge" id="renderBadge" hidden>영상 만드는 중 <span id="renderPercent">0%</span></div>
+      </div>
+
+      <div class="transport">
+        <button class="icon-button" id="restartButton" type="button" aria-label="처음부터 다시 보기">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7v5h5M5.5 11A7 7 0 1 1 7 18"/></svg>
+        </button>
+        <button class="play-button" id="playButton" type="button" aria-label="재생">
+          <svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 7 8 5-8 5V7Z"/></svg>
+          <svg class="pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7v10M15 7v10"/></svg>
+        </button>
+        <div class="timeline-wrap">
+          <input id="timeline" type="range" min="0" max="1000" value="0" aria-label="재생 위치" />
+          <div class="time-label"><span id="currentTime">0:00</span><span id="totalTime">0:05</span></div>
+        </div>
+        <button class="icon-button" id="muteButton" type="button" aria-label="원본 영상 음소거 켜기/끄기">
+          <svg class="sound-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 10v4h3l4 3V7L8 10H5ZM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>
+          <svg class="sound-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 10v4h3l4 3V7L8 10H5ZM16 10l5 5M21 10l-5 5"/></svg>
+        </button>
+      </div>
+      <p class="stage-note" id="stageNote">타이틀 모션은 미리보기와 저장 결과에 동일하게 적용됩니다.</p>
+    </section>
+
+    <aside class="inspector" aria-label="오프닝 시퀀스 편집 도구">
+      <section class="intro-block">
+        <div>
+          <p class="eyebrow">OPENING SEQUENCE</p>
+          <h1>여러 장면의 온도를<br>하나의 이야기로.</h1>
+        </div>
+        <button class="text-button" id="resetButton" type="button">초기화</button>
+      </section>
+
+      <section class="control-section open">
+        <button class="section-trigger" type="button" aria-expanded="true">
+          <span><b>01</b> 미디어</span><svg viewBox="0 0 24 24"><path d="m8 10 4 4 4-4"/></svg>
+        </button>
+        <div class="section-content">
+          <input id="mediaInput" type="file" accept="image/*,video/*" multiple hidden />
+          <button class="upload-drop" id="uploadButton" type="button">
+            <span class="upload-icon"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M5 15v4h14v-4"/></svg></span>
+            <span><strong id="uploadTitle">사진·영상 여러 개 선택</strong><small id="uploadHelp">한 번에 여러 파일 선택 · 최대 20개</small></span>
+          </button>
+          <div class="scene-list" id="sceneList" hidden>
+            <div class="scene-list-head"><span id="sceneCount">장면 0개</span><button id="clearScenesButton" type="button">전체 삭제</button></div>
+            <div class="scene-strip" id="sceneStrip" aria-label="선택한 장면 순서"></div>
+            <p class="scene-help">장면을 눌러 미리보고, 화살표로 순서를 바꿀 수 있어요.</p>
+          </div>
+          <div class="field-row two">
+            <label class="field">화면 비율
+              <select id="ratioSelect">
+                <option value="9:16">릴스 · 9:16</option>
+                <option value="4:5">피드 · 4:5</option>
+                <option value="1:1">정방형 · 1:1</option>
+                <option value="16:9">가로 · 16:9</option>
+              </select>
+            </label>
+            <label class="field">전체 길이
+              <select id="durationSelect">
+                <option value="5" selected>5초</option><option value="8">8초</option><option value="10">10초</option><option value="15">15초</option><option value="20">20초</option><option value="30">30초</option>
+              </select>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="control-section open">
+        <button class="section-trigger" type="button" aria-expanded="true">
+          <span><b>02</b> 타이틀</span><svg viewBox="0 0 24 24"><path d="m8 10 4 4 4-4"/></svg>
+        </button>
+        <div class="section-content">
+          <div class="title-inputs">
+            <label><span>작은 문구</span><input id="line1" type="text" value="SCENES FROM" maxlength="36" /></label>
+            <label><span>메인 타이틀</span><input id="line2" type="text" value="Seoul" maxlength="30" /></label>
+            <label><span>연결 문구</span><input id="line3" type="text" value="WITH" maxlength="24" /></label>
+            <label><span>두 번째 타이틀</span><input id="line4" type="text" value="Love" maxlength="30" /></label>
+          </div>
+          <div class="field-row two">
+            <label class="field">서체
+              <select id="fontSelect">
+                <option value="Bodoni Moda">Bodoni Romance</option>
+                <option value="Cormorant Garamond">Cormorant Classic</option>
+                <option value="DM Serif Display">DM Serif</option>
+                <option value="Italiana">Italiana</option>
+              </select>
+            </label>
+            <label class="field local-font">나만의 서체
+              <input id="fontInput" type="file" accept=".ttf,.otf,.woff,.woff2" hidden />
+              <button id="fontUploadButton" type="button">폰트 파일 불러오기</button>
+            </label>
+          </div>
+          <div class="range-grid">
+            <label>크기 <output id="sizeOutput">100%</output><input id="sizeRange" type="range" min="60" max="145" value="100" /></label>
+            <label>세로 위치 <output id="yOutput">50%</output><input id="yRange" type="range" min="24" max="76" value="50" /></label>
+            <label>기울기 <output id="tiltOutput">-4°</output><input id="tiltRange" type="range" min="-12" max="12" value="-4" /></label>
+          </div>
+        </div>
+      </section>
+
+      <section class="control-section open">
+        <button class="section-trigger" type="button" aria-expanded="true">
+          <span><b>03</b> 영화 자막</span><svg viewBox="0 0 24 24"><path d="m8 10 4 4 4-4"/></svg>
+        </button>
+        <div class="section-content">
+          <label class="subtitle-text-field">자막 내용
+            <textarea id="subtitleText" rows="3" maxlength="240" placeholder="이 장면을 기억하고 싶었어요."></textarea>
+          </label>
+          <label class="toggle-row subtitle-toggle">자막 표시<input id="subtitleToggle" type="checkbox" checked><span></span></label>
+          <div class="field-row two">
+            <label class="field">영화 자막체
+              <select id="subtitleFontSelect">
+                <option value="Noto Sans KR">Modern Cinema</option>
+                <option value="Noto Serif KR">Classic Film</option>
+                <option value="Apple SD Gothic Neo">Apple Gothic</option>
+                <option value="Arial">Documentary</option>
+                <option value="Courier New">Typewriter</option>
+              </select>
+            </label>
+            <label class="field local-font">로컬 자막 폰트
+              <input id="subtitleFontInput" type="file" accept=".ttf,.otf,.woff,.woff2" hidden />
+              <button id="subtitleFontUploadButton" type="button">폰트 파일 가져오기</button>
+            </label>
+          </div>
+          <div class="field-row two">
+            <label class="field">자막 스타일
+              <select id="subtitleStyleSelect">
+                <option value="shadow">영화 그림자</option>
+                <option value="outline">검은 외곽선</option>
+                <option value="panel">반투명 배경</option>
+              </select>
+            </label>
+            <label class="field">자막색
+              <span class="color-control"><span>TEXT</span><input id="subtitleColorInput" type="color" value="#ffffff" /></span>
+            </label>
+          </div>
+          <div class="range-grid">
+            <label>자막 크기 <output id="subtitleSizeOutput">38</output><input id="subtitleSizeRange" type="range" min="24" max="64" value="38" /></label>
+            <label>하단 위치 <output id="subtitleYOutput">88%</output><input id="subtitleYRange" type="range" min="70" max="94" value="88" /></label>
+          </div>
+          <p class="font-note">아이폰에서는 TTF·OTF 폰트 파일을 ‘파일’ 앱에 저장한 뒤 불러올 수 있어요.</p>
+        </div>
+      </section>
+
+      <section class="control-section open">
+        <button class="section-trigger" type="button" aria-expanded="true">
+          <span><b>04</b> 무드</span><svg viewBox="0 0 24 24"><path d="m8 10 4 4 4-4"/></svg>
+        </button>
+        <div class="section-content">
+          <p class="control-label">영상 색감</p>
+          <div class="filter-list" role="radiogroup" aria-label="영상 색감 필터">
+            <button class="filter-card selected" data-filter="static" type="button" role="radio" aria-checked="true"><i class="filter-preview static"></i><span>Static Film<small>청록빛 하늘과 따뜻한 빛</small></span></button>
+            <button class="filter-card" data-filter="sunset" type="button" role="radio" aria-checked="false"><i class="filter-preview sunset"></i><span>Sunset 70s<small>짙은 금빛과 브라운</small></span></button>
+            <button class="filter-card" data-filter="cyan" type="button" role="radio" aria-checked="false"><i class="filter-preview cyan"></i><span>Cyan City<small>도시적인 청록 그림자</small></span></button>
+            <button class="filter-card" data-filter="faded" type="button" role="radio" aria-checked="false"><i class="filter-preview faded"></i><span>Faded Diary<small>바랜 90년대 필름</small></span></button>
+            <button class="filter-card" data-filter="clean" type="button" role="radio" aria-checked="false"><i class="filter-preview clean"></i><span>Original<small>색감 보정 없음</small></span></button>
+          </div>
+          <div class="range-grid filter-strength">
+            <label>필터 강도 <output id="filterOutput">78%</output><input id="filterRange" type="range" min="0" max="100" value="78" /></label>
+          </div>
+          <p class="control-label title-color-label">타이틀 색상</p>
+          <div class="preset-list" role="radiogroup" aria-label="컬러 프리셋">
+            <button class="preset selected" data-preset="rose" type="button" role="radio" aria-checked="true"><i style="--swatch:#f4868f"></i><span>Rose Film<small>로맨틱 핑크</small></span></button>
+            <button class="preset" data-preset="cream" type="button" role="radio" aria-checked="false"><i style="--swatch:#fff0ad"></i><span>Ivory Reel<small>크림 옐로</small></span></button>
+            <button class="preset" data-preset="orange" type="button" role="radio" aria-checked="false"><i style="--swatch:#f47b20"></i><span>Autumn Pop<small>선명한 오렌지</small></span></button>
+            <button class="preset" data-preset="blue" type="button" role="radio" aria-checked="false"><i style="--swatch:#89b7ff"></i><span>Blue Hour<small>차분한 블루</small></span></button>
+          </div>
+          <div class="color-row">
+            <label>글자색 <input id="colorInput" type="color" value="#f4868f" /></label>
+            <label>그림자색 <input id="shadowInput" type="color" value="#5c2530" /></label>
+          </div>
+          <div class="range-grid">
+            <label>필름 그레인 <output id="grainOutput">18%</output><input id="grainRange" type="range" min="0" max="50" value="18" /></label>
+            <label>비네트 <output id="vignetteOutput">22%</output><input id="vignetteRange" type="range" min="0" max="65" value="22" /></label>
+            <label>따뜻함 <output id="warmthOutput">12%</output><input id="warmthRange" type="range" min="-30" max="40" value="12" /></label>
+          </div>
+        </div>
+      </section>
+
+      <section class="control-section open">
+        <button class="section-trigger" type="button" aria-expanded="true">
+          <span><b>05</b> 움직임</span><svg viewBox="0 0 24 24"><path d="m8 10 4 4 4-4"/></svg>
+        </button>
+        <div class="section-content">
+          <div class="motion-options">
+            <label><input type="radio" name="motion" value="stagger" checked><span>한 줄씩<small>부드럽게 순차 등장</small></span></label>
+            <label><input type="radio" name="motion" value="rise"><span>필름 업<small>아래에서 천천히</small></span></label>
+            <label><input type="radio" name="motion" value="zoom"><span>소프트 줌<small>가까워지며 등장</small></span></label>
+          </div>
+          <label class="toggle-row">배경에 느린 줌 적용<input id="kenBurnsToggle" type="checkbox" checked><span></span></label>
+        </div>
+      </section>
+
+      <section class="export-section">
+        <button class="button primary" id="exportVideoButton" type="button">
+          <svg viewBox="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5M5 20h14"/></svg>영상 저장
+        </button>
+        <button class="button secondary" id="exportImageButton" type="button">현재 장면 이미지 저장</button>
+        <p>브라우저가 지원하는 최고 화질로 저장됩니다. 영상 저장이 지원되지 않는 기기에서는 이미지 저장을 이용해 주세요.</p>
+      </section>
+    </aside>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
