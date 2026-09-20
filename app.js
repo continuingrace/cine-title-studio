@@ -439,16 +439,44 @@
       const isVideo = file.type.startsWith('video/') || /\.(mp4|mov|m4v|webm)$/i.test(file.name);
       if (isVideo) {
         const video = document.createElement('video');
-        video.src = url; video.preload = 'auto'; video.playsInline = true; video.loop = true; video.muted = mediaMuted;
+        video.preload = 'metadata'; video.playsInline = true; video.loop = true; video.muted = mediaMuted;
         await new Promise((resolve, reject) => {
-          video.onloadeddata = resolve;
-          video.onerror = reject;
-          setTimeout(() => video.readyState >= 2 ? resolve() : reject(), 12000);
+          let settled = false;
+          const finish = (error) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeout);
+            error ? reject(error) : resolve();
+          };
+          const ready = () => video.videoWidth && video.videoHeight && finish();
+          const timeout = setTimeout(() => finish(new Error('영상 메타데이터 시간 초과')), 15000);
+          video.onloadedmetadata = ready;
+          video.oncanplay = ready;
+          video.onerror = () => finish(new Error('지원하지 않는 영상 형식'));
+          video.src = url;
+          video.load();
         });
         return { id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`, type:'video', name:file.name, url, element:video };
       }
-      const image = new Image(); image.src = url;
-      await image.decode();
+      const image = new Image();
+      image.decoding = 'async';
+      await new Promise((resolve, reject) => {
+        let settled = false;
+        const finish = (error) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          error ? reject(error) : resolve();
+        };
+        const timeout = setTimeout(() => finish(new Error('이미지 로딩 시간 초과')), 15000);
+        image.onload = async () => {
+          if (!image.naturalWidth || !image.naturalHeight) return finish(new Error('이미지 크기를 읽을 수 없습니다.'));
+          try { await image.decode?.(); } catch { /* load가 완료된 이미지는 그대로 사용합니다. */ }
+          finish();
+        };
+        image.onerror = () => finish(new Error('지원하지 않는 이미지 형식'));
+        image.src = url;
+      });
       return { id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`, type:'image', name:file.name, url, element:image };
     } catch (error) {
       URL.revokeObjectURL(url);
@@ -508,13 +536,19 @@
     if (!files.length) return clips.length >= 20 ? toast('장면은 최대 20개까지 추가할 수 있습니다.') : undefined;
     pause(); currentSeconds = 0;
     let failed = 0;
+    const failedFiles = [];
     for (const file of files) {
-      try { clips.push(await createClip(file)); } catch { failed += 1; }
+      try { clips.push(await createClip(file)); }
+      catch (error) {
+        failed += 1;
+        failedFiles.push(file.name);
+        console.warn('미디어를 불러오지 못했습니다.', file.name, error);
+      }
     }
     activeClipIndex = -1;
     applyRecommendedDuration(); renderSceneList(); syncVideoPlayback(0, false, true); renderFrame(0); updateTimeline();
-    if (clips.length) toast(failed ? `${files.length - failed}개를 추가했습니다. ${failed}개는 열지 못했어요.` : `${files.length}개 장면을 추가했습니다.`);
-    else toast('선택한 파일을 브라우저에서 열 수 없습니다.');
+    if (clips.length) toast(failed ? `${files.length - failed}개를 추가했습니다. ${failed}개는 열지 못했어요: ${failedFiles[0]}` : `${files.length}개 장면을 추가했습니다.`);
+    else toast(`선택한 파일을 열 수 없습니다: ${failedFiles[0] || '파일 형식을 확인해주세요.'}`);
   }
 
   function seekToScene(index) {
