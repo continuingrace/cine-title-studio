@@ -234,6 +234,11 @@
     const ink = layer.getContext('2d');
     ink.font = `italic 500 ${fontSize}px "${family}", Georgia, serif`;
     ink.textAlign = 'center'; ink.textBaseline = 'middle';
+    // 레퍼런스처럼 오른쪽에만 아주 얇게 보이는 활자 인쇄 오차입니다. 번짐·블러는 사용하지 않습니다.
+    ink.globalAlpha = .34;
+    ink.fillStyle = state.shadow;
+    ink.fillText(text, width / 2 + Math.max(1, fontSize * .008), height / 2 + fontSize * .025);
+    ink.globalAlpha = 1;
     ink.fillStyle = state.color;
     ink.fillText(text, width / 2, height / 2 + fontSize * .025);
     // 화면 밖으로 튀어나오는 그림자는 만들지 않고, 활자 안에서만 인쇄 농도를 살짝 바꿉니다.
