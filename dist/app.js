@@ -17,12 +17,14 @@
 
   const defaults = {
     ratio: '9:16', duration: 8, line1: 'SCENES FROM', line2: 'Seoul', line3: 'WITH', line4: 'Love',
-    font: 'Bodoni Moda', size: 100, y: 50, tilt: -4, color: '#ec91a6', shadow: '#b95671',
+    font: 'Instrument Serif', size: 100, y: 50, tilt: -4, color: '#ec91a6', shadow: '#b95671',
     grain: 18, vignette: 22, warmth: 12, colorFilter: 'static', filterIntensity: 78,
     motion: 'stagger', kenBurns: true, preset: 'rose', subtitleText: '', subtitleEnabled: true,
     subtitleFont: 'Noto Sans KR', subtitleStyle: 'shadow', subtitleColor: '#ffffff', subtitleSize: 38, subtitleY: 88
   };
   let state = { ...defaults, ...safeLoad() };
+  // 이전 기본값(Bodoni)을 쓰던 프로젝트만 새 시네마 이탤릭 기본값으로 옮기고, 직접 고른 서체는 유지합니다.
+  if (state.font === 'Bodoni Moda') state.font = 'Instrument Serif';
   let clips = [];
   let mediaMuted = true;
   let activeClipIndex = -1;
@@ -34,6 +36,8 @@
   let toastTimer = 0;
   let customFontName = '';
   let customSubtitleFontName = '';
+  let titleInkCache = new Map();
+  let titleInkCacheSignature = '';
 
   function safeLoad() {
     try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch { return {}; }
@@ -218,6 +222,40 @@
     return size;
   }
 
+  function titleInk(text, fontSize, family) {
+    const key = `${text}|${fontSize}|${family}|${state.color}|${state.shadow}`;
+    const cached = titleInkCache.get(key);
+    if (cached) return cached;
+    ctx.font = `italic 500 ${fontSize}px "${family}", Georgia, serif`;
+    const width = Math.ceil(ctx.measureText(text).width + fontSize * .24);
+    const height = Math.ceil(fontSize * 1.55);
+    const layer = document.createElement('canvas');
+    layer.width = width; layer.height = height;
+    const ink = layer.getContext('2d');
+    ink.font = `italic 500 ${fontSize}px "${family}", Georgia, serif`;
+    ink.textAlign = 'center'; ink.textBaseline = 'middle';
+    ink.fillStyle = state.color;
+    ink.fillText(text, width / 2, height / 2 + fontSize * .025);
+    // 화면 밖으로 튀어나오는 그림자는 만들지 않고, 활자 안에서만 인쇄 농도를 살짝 바꿉니다.
+    ink.save();
+    ink.globalCompositeOperation = 'source-atop';
+    ink.globalAlpha = .11;
+    ink.fillStyle = state.shadow;
+    ink.fillRect(0, 0, width, height);
+    let seed = Math.max(1, [...key].reduce((value, character) => (value * 31 + character.charCodeAt(0)) % 2147483647, 17));
+    const random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+    const flecks = Math.max(4, Math.floor((width * height) / 9000));
+    ink.globalAlpha = .22;
+    for (let i = 0; i < flecks; i++) {
+      const size = 1 + random() * 1.8;
+      ink.fillStyle = random() > .56 ? 'rgba(255,248,230,.58)' : state.shadow;
+      ink.fillRect(random() * width, random() * height, size, size);
+    }
+    ink.restore();
+    titleInkCache.set(key, layer);
+    return layer;
+  }
+
   function drawTitle(time) {
     const w = canvas.width, h = canvas.height;
     const duration = Math.min(state.duration, 4.2);
@@ -232,13 +270,14 @@
       { text: state.line3, offset: .035, size: .028, delay: .29 },
       { text: state.line4, offset: .12, size: .112, delay: .42 }
     ];
-    const inkLayer = document.createElement('canvas');
-    inkLayer.width = w; inkLayer.height = h;
-    const ink = inkLayer.getContext('2d');
-    ink.translate(w / 2, groupY);
-    ink.rotate(state.tilt * Math.PI / 180);
-    ink.textAlign = 'center';
-    ink.textBaseline = 'middle';
+    const cacheSignature = `${w}|${h}|${state.font}|${state.color}|${state.shadow}|${state.size}|${state.line1}|${state.line2}|${state.line3}|${state.line4}`;
+    if (cacheSignature !== titleInkCacheSignature) {
+      titleInkCache.clear();
+      titleInkCacheSignature = cacheSignature;
+    }
+    ctx.save();
+    ctx.translate(w / 2, groupY);
+    ctx.rotate(state.tilt * Math.PI / 180);
     lines.forEach((line, index) => {
       if (!line.text.trim()) return;
       const appear = easeOut((globalP - line.delay) / .22);
@@ -249,32 +288,15 @@
       if (state.motion === 'zoom') scale = .78 + appear * .22;
       const initialSize = h * line.size * fontScale;
       const fontSize = fitText(line.text, w * .84, initialSize, state.font);
-      ink.save();
-      ink.translate(0, h * line.offset + shiftY);
-      ink.scale(scale, scale);
-      ink.globalAlpha = appear * fadeOut;
-      ink.font = `italic 500 ${fontSize}px "${state.font}", Georgia, serif`;
-      ink.fillStyle = state.color;
-      ink.fillText(line.text, 0, 0);
-      ink.restore();
+      const layer = titleInk(line.text, fontSize, state.font);
+      ctx.save();
+      ctx.translate(0, h * line.offset + shiftY);
+      ctx.scale(scale, scale);
+      ctx.globalAlpha = appear * fadeOut;
+      ctx.drawImage(layer, -layer.width / 2, -layer.height / 2);
+      ctx.restore();
     });
-    // 색을 덧칠한 그림자가 아니라, 활자 안쪽에만 남는 바랜 인쇄 잉크 질감입니다.
-    ink.save();
-    ink.globalCompositeOperation = 'source-atop';
-    ink.globalAlpha = .12;
-    ink.fillStyle = state.shadow;
-    ink.fillRect(0, 0, w, h);
-    ink.globalAlpha = .24;
-    let seed = Math.floor(time * 24) + 97;
-    const random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
-    const flecks = Math.floor((w * h) / 12500);
-    for (let i = 0; i < flecks; i++) {
-      const size = 1 + random() * 2.6;
-      ink.fillStyle = random() > .55 ? 'rgba(255,248,230,.55)' : state.shadow;
-      ink.fillRect(random() * w, random() * h, size, size);
-    }
-    ink.restore();
-    ctx.drawImage(inkLayer, 0, 0);
+    ctx.restore();
   }
 
   function wrapSubtitle(text, maxWidth) {
@@ -778,6 +800,6 @@
     } catch {}
   }
 
-  document.fonts.ready.then(() => renderFrame(0));
+  document.fonts.ready.then(() => { titleInkCache.clear(); renderFrame(0); });
   syncUI(); bind(); registerWebMCP(); renderFrame(0); updateTimeline();
 })();
