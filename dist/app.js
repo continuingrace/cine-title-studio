@@ -183,13 +183,21 @@
 
   function drawClip(clip, zoom, alpha = 1) {
     if (!clip?.element) return false;
-    const ready = clip.type === 'image' ? clip.element.complete : clip.element.readyState >= 2;
+    const ready = clip.type === 'image'
+      ? clip.element.complete && clip.element.naturalWidth > 0 && clip.element.naturalHeight > 0
+      : clip.element.readyState >= 2 && clip.element.videoWidth > 0 && clip.element.videoHeight > 0;
     if (!ready) return false;
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    drawCover(clip.element, zoom);
-    ctx.restore();
-    return true;
+    try {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      drawCover(clip.element, zoom);
+      ctx.restore();
+      return true;
+    } catch (error) {
+      ctx.restore();
+      console.warn('미디어 프레임을 그리지 못했습니다.', clip.name, error);
+      return false;
+    }
   }
 
   function syncVideoPlayback(time, shouldPlay = isPlaying || isRendering, forceSeek = false) {
@@ -475,7 +483,7 @@
   async function createClip(file) {
     const url = URL.createObjectURL(file);
     try {
-      const isVideo = file.type.startsWith('video/') || /\.(mp4|mov|m4v|webm)$/i.test(file.name);
+      const isVideo = (file.type || '').startsWith('video/') || /\.(mp4|mov|m4v|webm)$/i.test(file.name);
       if (isVideo) {
         const video = document.createElement('video');
         video.preload = 'metadata'; video.playsInline = true; video.loop = true; video.muted = mediaMuted;
@@ -497,26 +505,37 @@
         });
         return { id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`, type:'video', name:file.name, url, element:video };
       }
+
+      // Safari에서는 Image.decode() 또는 off-DOM 이미지의 load 이벤트가 지연될 수 있습니다.
+      // 이미지를 즉시 장면 목록에 넣고, 준비되는 순간 캔버스를 다시 그립니다.
       const image = new Image();
       image.decoding = 'async';
-      await new Promise((resolve, reject) => {
-        let settled = false;
-        const finish = (error) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timeout);
-          error ? reject(error) : resolve();
-        };
-        const timeout = setTimeout(() => finish(new Error('이미지 로딩 시간 초과')), 15000);
-        image.onload = async () => {
-          if (!image.naturalWidth || !image.naturalHeight) return finish(new Error('이미지 크기를 읽을 수 없습니다.'));
-          try { await image.decode?.(); } catch { /* load가 완료된 이미지는 그대로 사용합니다. */ }
-          finish();
-        };
-        image.onerror = () => finish(new Error('지원하지 않는 이미지 형식'));
-        image.src = url;
-      });
-      return { id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`, type:'image', name:file.name, url, element:image };
+      const clip = { id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`, type:'image', name:file.name, url, element:image, loading:true, dataUrlFallback:false };
+      const refreshPreview = () => {
+        clip.loading = false;
+        if (!clips.some(item => item.id === clip.id)) return;
+        renderFrame(currentSeconds);
+        renderSceneList();
+      };
+      image.onload = () => {
+        if (image.naturalWidth && image.naturalHeight) refreshPreview();
+      };
+      image.onerror = () => {
+        // 일부 iOS 환경에서 blob: URL을 캔버스가 읽지 못하는 경우 data URL로 한 번 더 시도합니다.
+        if (!clip.dataUrlFallback && typeof FileReader !== 'undefined') {
+          clip.dataUrlFallback = true;
+          const reader = new FileReader();
+          reader.onload = () => { image.src = reader.result; };
+          reader.onerror = () => { clip.loading = false; refreshPreview(); toast(`${file.name}을 열지 못했어요.`); };
+          reader.readAsDataURL(file);
+          return;
+        }
+        clip.loading = false;
+        refreshPreview();
+        toast(`${file.name}을 열지 못했어요.`);
+      };
+      image.src = url;
+      return clip;
     } catch (error) {
       URL.revokeObjectURL(url);
       throw error;
@@ -545,7 +564,7 @@
       preview.src = clip.url; preview.alt = clip.type === 'image' ? clip.name : '';
       if (clip.type === 'video') { preview.muted = true; preview.playsInline = true; preview.preload = 'metadata'; }
       const number = document.createElement('span'); number.className = 'scene-number'; number.textContent = String(index + 1);
-      const type = document.createElement('span'); type.className = 'scene-type'; type.textContent = clip.type === 'video' ? 'VIDEO' : 'PHOTO';
+      const type = document.createElement('span'); type.className = 'scene-type'; type.textContent = clip.loading ? 'LOADING' : (clip.type === 'video' ? 'VIDEO' : 'PHOTO');
       previewButton.append(preview, number, type);
       previewButton.addEventListener('click', () => seekToScene(index));
       const name = document.createElement('span'); name.className = 'scene-name'; name.textContent = clip.name; name.title = clip.name;
@@ -576,6 +595,8 @@
     pause(); currentSeconds = 0;
     let failed = 0;
     const failedFiles = [];
+    // 선택이 끝나는 즉시 화면에 장면을 등록합니다. 사진은 로딩 완료를 기다리지 않으므로
+    // iPhone Safari에서도 빈 Aa 화면에 멈춰 보이지 않습니다.
     for (const file of files) {
       try { clips.push(await createClip(file)); }
       catch (error) {
@@ -586,7 +607,7 @@
     }
     activeClipIndex = -1;
     applyRecommendedDuration(); renderSceneList(); syncVideoPlayback(0, false, true); renderFrame(0); updateTimeline();
-    if (clips.length) toast(failed ? `${files.length - failed}개를 추가했습니다. ${failed}개는 열지 못했어요: ${failedFiles[0]}` : `${files.length}개 장면을 추가했습니다.`);
+    if (clips.length) toast(failed ? `${files.length - failed}개를 추가했습니다. ${failed}개는 열지 못했어요: ${failedFiles[0]}` : `${files.length}개 장면을 추가했습니다. 사진은 바로 미리보기에 표시됩니다.`);
     else toast(`선택한 파일을 열 수 없습니다: ${failedFiles[0] || '파일 형식을 확인해주세요.'}`);
   }
 
