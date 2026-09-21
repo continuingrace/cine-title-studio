@@ -17,8 +17,8 @@
 
   const defaults = {
     ratio: '9:16', duration: 8, line1: 'SCENES FROM', line2: 'Seoul', line3: 'WITH', line4: 'Love',
-    font: 'Instrument Serif', size: 100, y: 50, tilt: -4, color: '#e48b9b', shadow: '#914b51',
-    grain: 18, vignette: 22, warmth: 12, colorFilter: 'static', filterIntensity: 78,
+    font: 'Instrument Serif', size: 100, y: 50, tilt: -4, lineSpacing: 100, color: '#e48b9b', shadow: '#914b51',
+    grain: 18, vignette: 22, warmth: 12, colorFilter: 'static', filterIntensity: 78, filmColor: '#4a3229', filmOpacity: 14,
     motion: 'stagger', kenBurns: true, preset: 'rose', subtitleText: '', subtitleEnabled: true,
     subtitleFont: 'Noto Sans KR', subtitleStyle: 'shadow', subtitleColor: '#ffffff', subtitleSize: 38, subtitleY: 88
   };
@@ -70,12 +70,15 @@
     $('#sizeRange').value = state.size;
     $('#yRange').value = state.y;
     $('#tiltRange').value = state.tilt;
+    $('#lineSpacingRange').value = state.lineSpacing;
     $('#colorInput').value = state.color;
     $('#shadowInput').value = state.shadow;
     $('#grainRange').value = state.grain;
     $('#vignetteRange').value = state.vignette;
     $('#warmthRange').value = state.warmth;
     $('#filterRange').value = state.filterIntensity;
+    $('#filmColorInput').value = state.filmColor;
+    $('#filmOpacityRange').value = state.filmOpacity;
     $('#kenBurnsToggle').checked = state.kenBurns;
     $('#subtitleText').value = state.subtitleText;
     $('#subtitleToggle').checked = state.subtitleEnabled;
@@ -97,10 +100,12 @@
     $('#sizeOutput').textContent = `${state.size}%`;
     $('#yOutput').textContent = `${state.y}%`;
     $('#tiltOutput').textContent = `${state.tilt}°`;
+    $('#lineSpacingOutput').textContent = `${state.lineSpacing}%`;
     $('#grainOutput').textContent = `${state.grain}%`;
     $('#vignetteOutput').textContent = `${state.vignette}%`;
     $('#warmthOutput').textContent = `${state.warmth}%`;
     $('#filterOutput').textContent = `${state.filterIntensity}%`;
+    $('#filmOpacityOutput').textContent = `${state.filmOpacity}%`;
     $('#subtitleSizeOutput').textContent = String(state.subtitleSize);
     $('#subtitleYOutput').textContent = `${state.subtitleY}%`;
   }
@@ -157,6 +162,34 @@
     } else if (state.colorFilter === 'faded') {
       ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = .16 * k; ctx.fillStyle = '#5a5040'; ctx.fillRect(0,0,canvas.width,canvas.height);
       ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = .16 * k; ctx.fillStyle = '#c98464'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    }
+    ctx.restore();
+  }
+
+  function addFilmSheet(time) {
+    const opacity = state.filmOpacity / 100;
+    if (opacity <= 0) return;
+    ctx.save();
+    // 반투명 컬러 필름지: 배경만 눌러 타이틀이 밝은 장면에서도 읽히게 합니다.
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = opacity * .72;
+    ctx.fillStyle = state.filmColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalCompositeOperation = 'soft-light';
+    ctx.globalAlpha = opacity * .52;
+    ctx.fillStyle = '#f5d9a8';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // 필름지 안쪽의 미세한 색 입자와 먼지. 타이틀보다 먼저 그려 텍스트는 또렷하게 유지합니다.
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = Math.min(.14, opacity * .34);
+    let seed = Math.floor(time * 24) + 173;
+    const random = () => { seed = (seed * 48271) % 2147483647; return (seed - 1) / 2147483646; };
+    const count = Math.floor((canvas.width * canvas.height) / 4600 * Math.min(1.5, opacity * 5));
+    for (let i = 0; i < count; i++) {
+      const pale = random() > .52;
+      ctx.fillStyle = pale ? '#f7e6c2' : state.filmColor;
+      const size = .8 + random() * 2.1;
+      ctx.fillRect(random() * canvas.width, random() * canvas.height, size, size);
     }
     ctx.restore();
   }
@@ -279,6 +312,7 @@
     const fadeOut = 1 - easeOut((time - (titleSpan - .65)) / .65);
     const fontScale = state.size / 100;
     const groupY = h * (state.y / 100);
+    const lineSpacing = state.lineSpacing / 100;
     const lines = [
       { text: state.line1, offset: -.135, size: .034, delay: .04 },
       { text: state.line2, offset: -.047, size: .118, delay: .16 },
@@ -305,7 +339,7 @@
       const fontSize = fitText(line.text, w * .84, initialSize, state.font);
       const layer = titleInk(line.text, fontSize, state.font);
       ctx.save();
-      ctx.translate(0, h * line.offset + shiftY);
+      ctx.translate(0, h * line.offset * lineSpacing + shiftY);
       ctx.scale(scale, scale);
       ctx.globalAlpha = appear * fadeOut;
       ctx.drawImage(layer, -layer.width / 2, -layer.height / 2);
@@ -433,6 +467,7 @@
     }
     ctx.filter = 'none';
     applyColorGrade();
+    addFilmSheet(time);
     addMood(time);
     drawTitle(time);
     drawSubtitle(time);
@@ -787,12 +822,13 @@
     $('#subtitleFontSelect').addEventListener('change', e => { state.subtitleFont=e.target.value; renderFrame(currentSeconds); save(); });
     $('#subtitleStyleSelect').addEventListener('change', e => { state.subtitleStyle=e.target.value; renderFrame(currentSeconds); save(); });
     $('#subtitleColorInput').addEventListener('input', e => { state.subtitleColor=e.target.value; renderFrame(currentSeconds); save(); });
-    const ranges = { sizeRange:['size',false], yRange:['y',false], tiltRange:['tilt',false], grainRange:['grain',true], vignetteRange:['vignette',true], warmthRange:['warmth',true], filterRange:['filterIntensity',false], subtitleSizeRange:['subtitleSize',false], subtitleYRange:['subtitleY',false] };
+    const ranges = { sizeRange:['size',false], yRange:['y',false], tiltRange:['tilt',false], lineSpacingRange:['lineSpacing',false], grainRange:['grain',true], vignetteRange:['vignette',true], warmthRange:['warmth',true], filterRange:['filterIntensity',false], filmOpacityRange:['filmOpacity',false], subtitleSizeRange:['subtitleSize',false], subtitleYRange:['subtitleY',false] };
     Object.entries(ranges).forEach(([id,[key,breakPreset]]) => $(`#${id}`).addEventListener('input', e => {
       state[key]=Number(e.target.value); if (breakPreset) state.preset='custom'; updateOutputs(); renderFrame(currentSeconds); save();
     }));
     $('#colorInput').addEventListener('input', e => { state.color=e.target.value; state.preset='custom'; renderFrame(currentSeconds); save(); });
     $('#shadowInput').addEventListener('input', e => { state.shadow=e.target.value; state.preset='custom'; renderFrame(currentSeconds); save(); });
+    $('#filmColorInput').addEventListener('input', e => { state.filmColor=e.target.value; renderFrame(currentSeconds); save(); });
     $$('.preset').forEach(button => button.addEventListener('click', () => selectPreset(button.dataset.preset)));
     $$('.filter-card').forEach(button => button.addEventListener('click', () => selectColorFilter(button.dataset.filter)));
     $$('input[name="motion"]').forEach(input => input.addEventListener('change', e => { state.motion=e.target.value; restart(false); renderFrame(state.duration*.65); save(); }));
