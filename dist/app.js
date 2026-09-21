@@ -9,15 +9,15 @@
   const storageKey = 'cine-title-studio-v01';
 
   const presets = {
-    rose: { color: '#ec91a6', shadow: '#b95671', warmth: 8, grain: 18, vignette: 18 },
-    cream: { color: '#f3e7a8', shadow: '#c6ab73', warmth: 16, grain: 22, vignette: 22 },
-    orange: { color: '#ef8a22', shadow: '#b95e17', warmth: 20, grain: 16, vignette: 16 },
+    rose: { color: '#e48b9b', shadow: '#914b51', warmth: 8, grain: 20, vignette: 20 },
+    cream: { color: '#f0e7ad', shadow: '#8d6740', warmth: 16, grain: 23, vignette: 23 },
+    orange: { color: '#e78a2b', shadow: '#91481c', warmth: 20, grain: 18, vignette: 18 },
     blue: { color: '#9fbfea', shadow: '#6188ba', warmth: -10, grain: 14, vignette: 20 }
   };
 
   const defaults = {
     ratio: '9:16', duration: 8, line1: 'SCENES FROM', line2: 'Seoul', line3: 'WITH', line4: 'Love',
-    font: 'Instrument Serif', size: 100, y: 50, tilt: -4, color: '#ec91a6', shadow: '#b95671',
+    font: 'Instrument Serif', size: 100, y: 50, tilt: -4, color: '#e48b9b', shadow: '#914b51',
     grain: 18, vignette: 22, warmth: 12, colorFilter: 'static', filterIntensity: 78,
     motion: 'stagger', kenBurns: true, preset: 'rose', subtitleText: '', subtitleEnabled: true,
     subtitleFont: 'Noto Sans KR', subtitleStyle: 'shadow', subtitleColor: '#ffffff', subtitleSize: 38, subtitleY: 88
@@ -125,8 +125,8 @@
   function mediaFilterStyle() {
     const k = state.filterIntensity / 100;
     const profiles = {
-      static: { contrast:1.14, saturation:.86, brightness:.97, sepia:.08, hue:-3 },
-      sunset: { contrast:1.1, saturation:1.02, brightness:.96, sepia:.24, hue:-7 },
+      static: { contrast:.94, saturation:.78, brightness:1.01, sepia:.17, hue:-4 },
+      sunset: { contrast:.98, saturation:.88, brightness:.99, sepia:.22, hue:-7 },
       cyan: { contrast:1.12, saturation:.94, brightness:.98, sepia:.03, hue:8 },
       faded: { contrast:.9, saturation:.76, brightness:1.06, sepia:.16, hue:-4 },
       clean: { contrast:1, saturation:1, brightness:1, sepia:0, hue:0 }
@@ -141,11 +141,13 @@
     if (!k || state.colorFilter === 'clean') return;
     ctx.save();
     if (state.colorFilter === 'static') {
-      ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = .14 * k; ctx.fillStyle = '#164451'; ctx.fillRect(0,0,canvas.width,canvas.height);
-      ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = .24 * k;
+      // 오래된 컬러 필름처럼 검정은 살짝 들고, 녹색 그림자와 앰버 하이라이트를 남깁니다.
+      ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = .075 * k; ctx.fillStyle = '#aa9272'; ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = .22 * k;
       const g = ctx.createLinearGradient(0,0,canvas.width,canvas.height);
-      g.addColorStop(0,'#4ea3a8'); g.addColorStop(.52,'#6e6a45'); g.addColorStop(1,'#e1743c');
+      g.addColorStop(0,'#788166'); g.addColorStop(.52,'#b8945d'); g.addColorStop(1,'#ba7040');
       ctx.fillStyle = g; ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = .055 * k; ctx.fillStyle = '#574837'; ctx.fillRect(0,0,canvas.width,canvas.height);
     } else if (state.colorFilter === 'sunset') {
       ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = .34 * k; ctx.fillStyle = '#d97732'; ctx.fillRect(0,0,canvas.width,canvas.height);
       ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = .08 * k; ctx.fillStyle = '#4b231d'; ctx.fillRect(0,0,canvas.width,canvas.height);
@@ -235,22 +237,22 @@
     ink.font = `italic 500 ${fontSize}px "${family}", Georgia, serif`;
     ink.textAlign = 'center'; ink.textBaseline = 'middle';
     // 레퍼런스처럼 오른쪽에만 아주 얇게 보이는 활자 인쇄 오차입니다. 번짐·블러는 사용하지 않습니다.
-    ink.globalAlpha = .34;
+    ink.globalAlpha = .42;
     ink.fillStyle = state.shadow;
-    ink.fillText(text, width / 2 + Math.max(1, fontSize * .008), height / 2 + fontSize * .025);
+    ink.fillText(text, width / 2 + Math.max(1, fontSize * .011), height / 2 + fontSize * .025);
     ink.globalAlpha = 1;
     ink.fillStyle = state.color;
     ink.fillText(text, width / 2, height / 2 + fontSize * .025);
     // 화면 밖으로 튀어나오는 그림자는 만들지 않고, 활자 안에서만 인쇄 농도를 살짝 바꿉니다.
     ink.save();
     ink.globalCompositeOperation = 'source-atop';
-    ink.globalAlpha = .11;
+    ink.globalAlpha = .15;
     ink.fillStyle = state.shadow;
     ink.fillRect(0, 0, width, height);
     let seed = Math.max(1, [...key].reduce((value, character) => (value * 31 + character.charCodeAt(0)) % 2147483647, 17));
     const random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
     const flecks = Math.max(4, Math.floor((width * height) / 9000));
-    ink.globalAlpha = .22;
+    ink.globalAlpha = .28;
     for (let i = 0; i < flecks; i++) {
       const size = 1 + random() * 1.8;
       ink.fillStyle = random() > .56 ? 'rgba(255,248,230,.58)' : state.shadow;
