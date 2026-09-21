@@ -9,15 +9,15 @@
   const storageKey = 'cine-title-studio-v01';
 
   const presets = {
-    rose: { color: '#f4868f', shadow: '#5c2530', warmth: 12, grain: 18, vignette: 22 },
-    cream: { color: '#fff0ad', shadow: '#54422b', warmth: 20, grain: 22, vignette: 27 },
-    orange: { color: '#f47b20', shadow: '#75320d', warmth: 24, grain: 16, vignette: 18 },
-    blue: { color: '#89b7ff', shadow: '#24395b', warmth: -12, grain: 14, vignette: 25 }
+    rose: { color: '#ec91a6', shadow: '#b95671', warmth: 8, grain: 18, vignette: 18 },
+    cream: { color: '#f3e7a8', shadow: '#c6ab73', warmth: 16, grain: 22, vignette: 22 },
+    orange: { color: '#ef8a22', shadow: '#b95e17', warmth: 20, grain: 16, vignette: 16 },
+    blue: { color: '#9fbfea', shadow: '#6188ba', warmth: -10, grain: 14, vignette: 20 }
   };
 
   const defaults = {
     ratio: '9:16', duration: 8, line1: 'SCENES FROM', line2: 'Seoul', line3: 'WITH', line4: 'Love',
-    font: 'Bodoni Moda', size: 100, y: 50, tilt: -4, color: '#f4868f', shadow: '#5c2530',
+    font: 'Bodoni Moda', size: 100, y: 50, tilt: -4, color: '#ec91a6', shadow: '#b95671',
     grain: 18, vignette: 22, warmth: 12, colorFilter: 'static', filterIntensity: 78,
     motion: 'stagger', kenBurns: true, preset: 'rose', subtitleText: '', subtitleEnabled: true,
     subtitleFont: 'Noto Sans KR', subtitleStyle: 'shadow', subtitleColor: '#ffffff', subtitleSize: 38, subtitleY: 88
@@ -232,12 +232,13 @@
       { text: state.line3, offset: .035, size: .028, delay: .29 },
       { text: state.line4, offset: .12, size: .112, delay: .42 }
     ];
-    ctx.save();
-    ctx.translate(w / 2, groupY);
-    ctx.rotate(state.tilt * Math.PI / 180);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.lineJoin = 'round';
+    const inkLayer = document.createElement('canvas');
+    inkLayer.width = w; inkLayer.height = h;
+    const ink = inkLayer.getContext('2d');
+    ink.translate(w / 2, groupY);
+    ink.rotate(state.tilt * Math.PI / 180);
+    ink.textAlign = 'center';
+    ink.textBaseline = 'middle';
     lines.forEach((line, index) => {
       if (!line.text.trim()) return;
       const appear = easeOut((globalP - line.delay) / .22);
@@ -248,23 +249,32 @@
       if (state.motion === 'zoom') scale = .78 + appear * .22;
       const initialSize = h * line.size * fontScale;
       const fontSize = fitText(line.text, w * .84, initialSize, state.font);
-      ctx.save();
-      ctx.translate(0, h * line.offset + shiftY);
-      ctx.scale(scale, scale);
-      ctx.globalAlpha = appear * fadeOut;
-      ctx.font = `italic 600 ${fontSize}px "${state.font}", Georgia, serif`;
-      ctx.shadowColor = state.shadow;
-      ctx.shadowBlur = Math.max(4, h * .004);
-      ctx.shadowOffsetX = Math.max(3, h * .0025);
-      ctx.shadowOffsetY = Math.max(3, h * .0032);
-      ctx.lineWidth = Math.max(1.4, h * .00135);
-      ctx.strokeStyle = state.shadow;
-      ctx.fillStyle = state.color;
-      ctx.strokeText(line.text, 0, 0);
-      ctx.fillText(line.text, 0, 0);
-      ctx.restore();
+      ink.save();
+      ink.translate(0, h * line.offset + shiftY);
+      ink.scale(scale, scale);
+      ink.globalAlpha = appear * fadeOut;
+      ink.font = `italic 500 ${fontSize}px "${state.font}", Georgia, serif`;
+      ink.fillStyle = state.color;
+      ink.fillText(line.text, 0, 0);
+      ink.restore();
     });
-    ctx.restore();
+    // 색을 덧칠한 그림자가 아니라, 활자 안쪽에만 남는 바랜 인쇄 잉크 질감입니다.
+    ink.save();
+    ink.globalCompositeOperation = 'source-atop';
+    ink.globalAlpha = .12;
+    ink.fillStyle = state.shadow;
+    ink.fillRect(0, 0, w, h);
+    ink.globalAlpha = .24;
+    let seed = Math.floor(time * 24) + 97;
+    const random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+    const flecks = Math.floor((w * h) / 12500);
+    for (let i = 0; i < flecks; i++) {
+      const size = 1 + random() * 2.6;
+      ink.fillStyle = random() > .55 ? 'rgba(255,248,230,.55)' : state.shadow;
+      ink.fillRect(random() * w, random() * h, size, size);
+    }
+    ink.restore();
+    ctx.drawImage(inkLayer, 0, 0);
   }
 
   function wrapSubtitle(text, maxWidth) {
