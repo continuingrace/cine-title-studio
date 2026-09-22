@@ -444,6 +444,21 @@
     }
   }
 
+  function drawFilmGate(time) {
+    if (state.motion !== 'gate') return;
+    // 레퍼런스의 첫 컷처럼, 검은 프레임 안에서 얇은 가로 화면이 열려 전체 장면으로 확장됩니다.
+    const progress = easeOut((time - .14) / 1.48);
+    if (progress >= 1) return;
+    const halfHeight = canvas.height * (.008 + .492 * clamp(progress));
+    const top = canvas.height / 2 - halfHeight;
+    const bottom = canvas.height / 2 + halfHeight;
+    ctx.save();
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvas.width, Math.max(0, top));
+    ctx.fillRect(0, Math.min(canvas.height, bottom), canvas.width, Math.max(0, canvas.height - bottom));
+    ctx.restore();
+  }
+
   function renderFrame(time = 0) {
     ctx.save();
     ctx.fillStyle = '#1b1a18';
@@ -469,6 +484,7 @@
     applyColorGrade();
     addFilmSheet(time);
     addMood(time);
+    drawFilmGate(time);
     drawTitle(time);
     drawSubtitle(time);
     ctx.restore();
@@ -831,7 +847,12 @@
     $('#filmColorInput').addEventListener('input', e => { state.filmColor=e.target.value; renderFrame(currentSeconds); save(); });
     $$('.preset').forEach(button => button.addEventListener('click', () => selectPreset(button.dataset.preset)));
     $$('.filter-card').forEach(button => button.addEventListener('click', () => selectColorFilter(button.dataset.filter)));
-    $$('input[name="motion"]').forEach(input => input.addEventListener('change', e => { state.motion=e.target.value; restart(false); renderFrame(state.duration*.65); save(); }));
+    $$('input[name="motion"]').forEach(input => input.addEventListener('change', e => {
+      state.motion=e.target.value;
+      restart(false);
+      renderFrame(state.motion === 'gate' ? 0 : state.duration*.65);
+      save();
+    }));
     $('#kenBurnsToggle').addEventListener('change', e => { state.kenBurns=e.target.checked; renderFrame(currentSeconds); save(); });
     $('#resetButton').addEventListener('click', () => { state={...defaults}; syncUI(); save(); restart(false); toast('설정을 처음 상태로 돌렸습니다.'); });
     $('#exportImageButton').addEventListener('click', exportImage);
@@ -847,7 +868,7 @@
       modelContext.registerTool({
         name:'configure_title_sequence', title:'타이틀 시퀀스 설정',
         description:'현재 화면의 네 줄 타이틀, 글자색, 모션을 한 번에 설정합니다.',
-        inputSchema:{type:'object',properties:{line1:{type:'string'},line2:{type:'string'},line3:{type:'string'},line4:{type:'string'},subtitleText:{type:'string'},color:{type:'string',pattern:'^#[0-9a-fA-F]{6}$'},motion:{type:'string',enum:['stagger','rise','zoom']}},additionalProperties:false},
+        inputSchema:{type:'object',properties:{line1:{type:'string'},line2:{type:'string'},line3:{type:'string'},line4:{type:'string'},subtitleText:{type:'string'},color:{type:'string',pattern:'^#[0-9a-fA-F]{6}$'},motion:{type:'string',enum:['stagger','rise','zoom','gate']}},additionalProperties:false},
         annotations:{readOnlyHint:false,untrustedContentHint:false},
         execute(input){
           ['line1','line2','line3','line4','subtitleText','color','motion'].forEach(key => { if (input[key] !== undefined) state[key]=input[key]; });
