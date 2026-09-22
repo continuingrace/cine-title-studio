@@ -170,18 +170,19 @@
     const opacity = state.filmOpacity / 100;
     if (opacity <= 0) return;
     ctx.save();
-    // 반투명 컬러 필름지: 배경만 눌러 타이틀이 밝은 장면에서도 읽히게 합니다.
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.globalAlpha = opacity * .72;
+    // 실제 반투명 컬러 필름지: 밝은 사진을 충분히 눌러 타이틀의 대비를 확보합니다.
+    // 타이틀은 이 레이어 뒤에서 그려지므로 농도를 높여도 글자는 흐려지지 않습니다.
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = opacity * .78;
     ctx.fillStyle = state.filmColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.globalCompositeOperation = 'soft-light';
-    ctx.globalAlpha = opacity * .52;
+    ctx.globalAlpha = opacity * .16;
     ctx.fillStyle = '#f5d9a8';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     // 필름지 안쪽의 미세한 색 입자와 먼지. 타이틀보다 먼저 그려 텍스트는 또렷하게 유지합니다.
     ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = Math.min(.14, opacity * .34);
+    ctx.globalAlpha = Math.min(.16, opacity * .34);
     let seed = Math.floor(time * 24) + 173;
     const random = () => { seed = (seed * 48271) % 2147483647; return (seed - 1) / 2147483646; };
     const count = Math.floor((canvas.width * canvas.height) / 4600 * Math.min(1.5, opacity * 5));
