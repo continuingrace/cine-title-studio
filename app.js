@@ -16,10 +16,10 @@
   };
 
   const defaults = {
-    ratio: '9:16', duration: 8, line1: 'SCENES FROM', line2: 'Seoul', line3: 'WITH', line4: 'Love',
-    font: 'Instrument Serif', size: 100, y: 50, tilt: -4, lineSpacing: 100, color: '#e48b9b', shadow: '#914b51',
+    ratio: '9:16', duration: 8, line1: 'Gott behütet mich.', line2: 'Dankbar', line3: 'für', line4: 'Gottes Begleitung',
+    font: 'Instrument Serif', size: 84, y: 50, tilt: -4, lineSpacing: 91, color: '#e48b9b', shadow: '#914b51',
     grain: 18, vignette: 22, warmth: 12, colorFilter: 'static', filterIntensity: 78, filmColor: '#4a3229', filmOpacity: 14,
-    motion: 'stagger', kenBurns: true, preset: 'rose', subtitleText: '', subtitleEnabled: true,
+    motion: 'stagger', kenBurns: true, preset: 'rose', subtitleText: '어디에 있든지 하나님께서 함께하심에 감사하다.', subtitleEnabled: true,
     subtitleFont: 'Noto Sans KR', subtitleStyle: 'shadow', subtitleColor: '#ffffff', subtitleSize: 38, subtitleY: 88
   };
   let state = { ...defaults, ...safeLoad() };
