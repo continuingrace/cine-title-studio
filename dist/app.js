@@ -447,7 +447,11 @@
   function drawFilmGate(time) {
     if (state.motion !== 'gate') return;
     // 레퍼런스의 첫 컷처럼, 검은 프레임 안에서 얇은 가로 화면이 열려 전체 장면으로 확장됩니다.
-    const progress = easeOut((time - .14) / 1.48);
+    // 첫 움직임은 차분하게 시작하고 중간부터 살짝 속도를 붙인 뒤, 끝은 부드럽게 연결합니다.
+    const raw = clamp((time - .16) / 1.74);
+    const progress = raw < .8
+      ? .8 * Math.pow(raw / .8, 1.34)
+      : .8 + .2 * easeOut((raw - .8) / .2);
     if (progress >= 1) return;
     const halfHeight = canvas.height * (.008 + .492 * clamp(progress));
     const top = canvas.height / 2 - halfHeight;
