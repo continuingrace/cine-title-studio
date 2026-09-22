@@ -492,25 +492,38 @@
 
   function loop(now) {
     if (!isPlaying) return;
-    currentSeconds = (now - startedAt) / 1000;
-    if (currentSeconds >= state.duration) {
-      currentSeconds = 0;
-      startedAt = now;
-      syncVideoPlayback(0, true, true);
+    try {
+      currentSeconds = (now - startedAt) / 1000;
+      if (currentSeconds >= state.duration) {
+        currentSeconds = 0;
+        startedAt = now;
+        syncVideoPlayback(0, true, true);
+      }
+      syncVideoPlayback(currentSeconds, true, false);
+      renderFrame(currentSeconds);
+      updateTimeline();
+      animationFrame = requestAnimationFrame(loop);
+    } catch (error) {
+      console.error('미리보기 재생을 멈춘 오류', error);
+      pause();
+      toast('미리보기 재생을 시작하지 못했습니다. 다시 눌러주세요.');
     }
-    syncVideoPlayback(currentSeconds, true, false);
-    renderFrame(currentSeconds);
-    updateTimeline();
-    animationFrame = requestAnimationFrame(loop);
   }
 
   function play() {
     if (isPlaying || isRendering) return;
+    if (!clips.length) {
+      renderFrame(0);
+      return toast('먼저 사진이나 영상을 선택해 주세요.');
+    }
     isPlaying = true;
     playButton.classList.add('is-playing');
     playButton.setAttribute('aria-label','일시정지');
     startedAt = performance.now() - currentSeconds * 1000;
     syncVideoPlayback(currentSeconds, true, true);
+    // 첫 프레임을 즉시 그려 iPhone Safari에서 재생 버튼만 바뀌고 화면이 멈춰 보이지 않게 합니다.
+    renderFrame(currentSeconds);
+    updateTimeline();
     animationFrame = requestAnimationFrame(loop);
   }
   function pause() {
@@ -537,7 +550,7 @@
       const isVideo = (file.type || '').startsWith('video/') || /\.(mp4|mov|m4v|webm)$/i.test(file.name);
       if (isVideo) {
         const video = document.createElement('video');
-        video.preload = 'metadata'; video.playsInline = true; video.loop = true; video.muted = mediaMuted;
+        video.preload = 'auto'; video.playsInline = true; video.setAttribute('playsinline', ''); video.loop = true; video.muted = mediaMuted;
         await new Promise((resolve, reject) => {
           let settled = false;
           const finish = (error) => {
@@ -660,6 +673,7 @@
     applyRecommendedDuration(); renderSceneList(); syncVideoPlayback(0, false, true); renderFrame(0); updateTimeline();
     if (clips.length) toast(failed ? `${files.length - failed}개를 추가했습니다. ${failed}개는 열지 못했어요: ${failedFiles[0]}` : `${files.length}개 장면을 추가했습니다. 사진은 바로 미리보기에 표시됩니다.`);
     else toast(`선택한 파일을 열 수 없습니다: ${failedFiles[0] || '파일 형식을 확인해주세요.'}`);
+    if (clips.length) play();
   }
 
   function seekToScene(index) {
